@@ -15,7 +15,6 @@ import scan_datafile as sd
 from skimage.measure import profile_line
 import Analisis_lifetime as al
 
-plt.style.use(r"C:\Users\Lenovo\Downloads\gula_style.mplstyle")
 plt.rcParams["text.usetex"] = False
 plt.rcParams["font.family"] = "serif"
 
@@ -34,7 +33,7 @@ for j in range(9):
 
 datos_5.append(sd.ScanDataFile.open(rf"C:\Users\Lenovo\Downloads\Calibracion_ida_vuelta\5x5\calibracion_5x5_0C_scan.NPY"))
 #%%
-def graficar(imagen, pixel_size_um=1, titulo="(ida)"):
+def graficar(imagen, pixel_size_um=1/20, titulo="(Vuelta (soft))"):
     """
     Muestra la imagen directamente, calculando los ejes físicos automáticamente.
     
@@ -54,7 +53,7 @@ def graficar(imagen, pixel_size_um=1, titulo="(ida)"):
     y_extent = ny * pixel_size_um
 
     fig, ax = plt.subplots(constrained_layout=True)
-    im = ax.imshow(imagen, cmap='inferno',
+    im = ax.imshow(imagen, cmap='turbo',
                    extent=[0, x_extent, 0, y_extent],
                    origin='lower',
                    aspect='equal')
@@ -368,6 +367,39 @@ compare_profiles(dist_ida , prof_ida, dist_vuelta, prof_vuelta, dwell_time_10[c]
 # ida_img = datos_5[c][0][0]
 # vuelta_img = datos_5[c][0][1]
 # dist_ida, prof_ida, dist_vuelta, prof_vuelta = get_line_profiles(ida_img, vuelta_img, x0_5, y0_5, x1_5, y1_5)
+#%%
+
+datos = sd.ScanDataFile.open(r"C:\Users\Luis1\Downloads\medicion_idavuelta\scan_07_scan.NPY")
+ida_img = datos[2][0]
+vuelta_img = datos[2][1]
+plot_ida_vuelta(ida_img, vuelta_img, 2/50, 400)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # compare_profiles(dist_ida , prof_ida, dist_vuelta, prof_vuelta, dwell_time_5[c])
 #%% Hagamos un promedio con las tres nanoparticulas que aparecen en 10
 distancia_10_1 = np.array([0.585,0.318,0.318,0.233, 0.231,0.234, 0.233, 0.160, 0.158])
