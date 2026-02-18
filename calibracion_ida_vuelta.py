@@ -13,7 +13,6 @@ from PIL import Image
 from scipy.signal import find_peaks
 import scan_datafile as sd
 from skimage.measure import profile_line
-import Analisis_lifetime as al
 
 plt.rcParams["text.usetex"] = False
 plt.rcParams["font.family"] = "serif"
@@ -21,7 +20,6 @@ plt.rcParams["font.family"] = "serif"
 path = r"C:\Users\Lenovo\Downloads\Calibracion_ida_vuelta\matplotvanda.py"
 
 sys.path.append(path)
-import matplotvanda as vd
 dwell_time_10 = [18,29,39,59,69,79,90,100,500]
 dwell_time_5 = [19,29,39,49,59,70,79,90,100,501]
 datos_10 = []
@@ -370,8 +368,8 @@ compare_profiles(dist_ida , prof_ida, dist_vuelta, prof_vuelta, dwell_time_10[c]
 #%%
 
 datos = sd.ScanDataFile.open(r"C:\Users\Luis1\Downloads\medicion_idavuelta\scan_07_scan.NPY")
-ida_img = datos[2][0]
-vuelta_img = datos[2][1]
+ida_img = datos[15][0]
+vuelta_img = datos[15][1]
 plot_ida_vuelta(ida_img, vuelta_img, 2/50, 400)
 
 
@@ -538,15 +536,6 @@ distancia_10_l = np.array([0.502,])
 
 
 #%%
-graficar(datos_10[0][0][0],0.050)
-graficar(imagen_ida_10[0].T, 0.050)
-#%%
-for i in range(len(datos_10)):
-    ida_soft = datos_10[i][0][0]
-    vuelta_soft = datos_10[i][0][1]
-    ida_life = imagen_ida_10[i].T
-    vuelta_life = np.flip(imagen_vuelta_10[i], axis = 1).T
-    ida, vuelta, diff = plot_soft_life(ida_soft, ida_life,pixel_size, dwell_time_10[i])
-    ida, vuelta, diff = plot_soft_life(vuelta_soft, vuelta_life,pixel_size, dwell_time_10[i])
+
 
     
