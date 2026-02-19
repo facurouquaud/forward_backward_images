@@ -406,10 +406,9 @@ precisions = np.array(precisions)
 #%%
 plt.figure()
 
-plt.plot(N_values, precisions, 'o-', label="Simulación")
-sigma = np.sqrt(0.13**2 + 0.13**2)
-#sigma = 0.26
-plt.scatter(595,sigma, label = "Experimental",color = "g")
+plt.plot(N_values, precisions, '-', label="Simulación", color = "olivedrab")
+sigma = np.sqrt(0.13**2 + 0.13**2) + 0.02 #Ajuste + PSF 
+plt.scatter(595, 0.3 , label = "Experimental",color = "darkolivegreen")
 plt.xlabel("Número de fotones N")
 plt.ylabel("Precisión de localización (µm)")
 plt.legend()
