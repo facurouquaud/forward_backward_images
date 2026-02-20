@@ -13,13 +13,17 @@ from PIL import Image
 from scipy.signal import find_peaks
 import scan_datafile as sd
 from skimage.measure import profile_line
-from scipy.optimize import curve_fit
+plt.style.use(r"C:\Users\Luis1\Downloads\gula_style.mplstyle")
+plt.rcParams["text.usetex"] = False
+plt.rcParams["font.family"] = "serif"
 from scipy.signal import fftconvolve
 from scipy.interpolate import interp1d
 import random
+from scipy.optimize import curve_fit
+from scipy.ndimage import shift
 
 
-datos = sd.ScanDataFile.open(r"C:\Users\Lenovo\Downloads\Calibracion_ida_vuelta\scan_07_scan.NPY")
+datos = sd.ScanDataFile.open(r"C:\Users\Luis1\Downloads\medicion_idavuelta\scan_07_scan.NPY")
 ida_img = datos[15][0]
 vuelta_img = datos[15][1]
 
@@ -37,7 +41,7 @@ for frame in datos:
     else:
         ida_sum += ida
         vuelta_sum += vuelta
-        
+#%%
 def graficar(imagen,tamano_um,n_pix):
     shape = (n_pix,n_pix)
     x = np.linspace(0, tamano_um, shape[1])  # horizontal (cols)
@@ -52,9 +56,9 @@ def graficar(imagen,tamano_um,n_pix):
     ax.set_ylabel("y [µm]")
     fig.colorbar(im, ax=ax, label="Número de fotones")
     ax.set_aspect('equal', adjustable='box')  
-#graficar(ida_sum,10,200)
+graficar(ida_sum,10,200)
 
-
+#%%
 
 def gaussian_2d(coords, A, x0, y0, sx, sy, B):
     x, y = coords
@@ -69,6 +73,7 @@ def fit_gaussian_2d(image):
     y = np.arange(ny)
     x, y = np.meshgrid(x, y)
 
+    # Estimaciones iniciales
     A0 = image.max()
     y0_0, x0_0 = np.unravel_index(np.argmax(image), image.shape)
     sigma0 = 3
@@ -76,21 +81,16 @@ def fit_gaussian_2d(image):
 
     p0 = (A0, x0_0, y0_0, sigma0, sigma0, offset0)
 
-    popt, pcov = curve_fit(
+    popt, _ = curve_fit(
         gaussian_2d,
         (x, y),
         image.ravel(),
         p0=p0
     )
 
-    perr = np.sqrt(np.diag(pcov))  # error estándar de cada parámetro
-
-    return popt, perr
-
-graficar(ida_img,10,200)
-#%%
-params_ida, err_ida = fit_gaussian_2d(ida_sum.T)
-params_vuelta, err_vuelta = fit_gaussian_2d(vuelta_sum.T)
+    return popt  # parámetros ajustados
+params_ida = fit_gaussian_2d(ida_sum.T)
+params_vuelta = fit_gaussian_2d(vuelta_sum.T)
 
 A_i, x0_i, y0_i, sx_i, sy_i, off_i = params_ida
 A_v, x0_v, y0_v, sx_v, sy_v, off_v = params_vuelta
@@ -113,45 +113,15 @@ y_i_um = y0_i * px_size_y
 x_v_um = x0_v * px_size_x
 y_v_um = y0_v * px_size_y
 
-# Convertir sigmas a µm
-sx_i_um = sx_i * px_size_x
-sy_i_um = sy_i * px_size_y
 
-sx_v_um = sx_v * px_size_x
-sy_v_um = sy_v * px_size_y
+graficar(ida_sum.T,10,200)
+plt.scatter(x_i_um, y_i_um, c='red', s=50)
 
-print("IDA:")
-print(f"y0 = {x_i_um:.3f} µm, x0 = {y_i_um:.3f} µm")
-print(f"sigma_x = {sx_i_um:.3f} µm, sigma_y = {sy_i_um:.3f} µm")
-
-print("\nVUELTA:")
-print(f"y0 = {x_v_um:.3f} µm, x0 = {y_v_um:.3f} µm")
-print(f"sigma_x = {sx_v_um:.3f} µm, sigma_y = {sy_v_um:.3f} µm")
-
-error_x0_ida = err_ida[1]
-error_y0_ida = err_ida[2]
-
-error_x0_vuelta = err_vuelta[1]
-error_y0_vuelta = err_vuelta[2]
-
-error_x0_ida_um = error_x0_ida * px_size_x
-error_y0_ida_um = error_y0_ida * px_size_y
-#graficar(ida_sum.T,10,200)
-#plt.scatter(x_i_um, y_i_um, c='red', s=50)
-
-#graficar(vuelta_sum.T,10,200)
-#plt.scatter(x_v_um, y_v_um, c='red', s=50)
+graficar(vuelta_sum.T,10,200)
+plt.scatter(x_v_um, y_v_um, c='red', s=50)
 
 
 #%%
-ny, nx = ida_sum.shape
-
-FOV_x = 10  # µm
-FOV_y = 10  # µm
-
-px_size_x = FOV_x / nx
-px_size_y = FOV_y / ny
-
 
 def cross_correlation_shift(img1, img2):
     img1 = img1 - np.mean(img1)
@@ -175,45 +145,37 @@ dy_pix, dx_pix, corr = cross_correlation_shift(ida_sum.T, vuelta_sum.T)
 dx_um = dx_pix * px_size_x
 dy_um = dy_pix * px_size_y
 
-print("Shift por correlación cruzada:")
-print(f"dx = {dx_pix:.3f} px  ({dx_um:.3f} µm)")
-print(f"dy = {dy_pix:.3f} px  ({dy_um:.3f} µm)")
 
 # Convertir a micrómetros
 dx_um = dx_pix * px_size_x
 dy_um = dy_pix * px_size_y
 
-print("Shift por correlación cruzada:")
-print(f"dx = {dx_pix:.3f} px  ({dx_um:.3f} µm)")
-print(f"dy = {dy_pix:.3f} px  ({dy_um:.3f} µm)")
-from scipy.ndimage import shift
+
 
 vuelta_alineada = shift(
     vuelta_sum.T,
-    shift=(dy_pix, dx_pix),
+    shift=(+dy_pix, +dx_pix),
     mode='constant'
 )
 # Diferencia residual
 residual = ida_sum.T - vuelta_alineada
 rms_error = np.sqrt(np.mean(residual**2))
 
-print(f"\nError RMS intensidad = {rms_error:.3f}")
 
 # Error geométrico total
 error_total_um = np.sqrt(dx_um**2 + dy_um**2)
 
-print(f"Desplazamiento total = {error_total_um:.3f} µm")
-#graficar(ida_sum.T,10,200)
-#graficar(vuelta_alineada,10,200)
+graficar(ida_sum.T,10,200)
+graficar(vuelta_alineada,10,200)
 
-def crop_overlap(img1, img2, dy, dx):
+def crop_overlap(img1, img2, dx, dy):
     ny, nx = img1.shape
 
     y_min = max(0, dy)
     y_max = min(ny, ny + dy)
 
-    x_min = max(0, dx)
-    x_max = min(nx, nx + dx)
+    x_min = max(0, -dx)
+    x_max = min(nx, nx - dx)
 
     img1_crop = img1[y_min:y_max, x_min:x_max]
     img2_crop = img2[y_min:y_max, x_min:x_max]
@@ -221,197 +183,273 @@ def crop_overlap(img1, img2, dy, dx):
     return img1_crop, img2_crop
 ida_crop, vuelta_crop = crop_overlap(ida_sum.T, vuelta_alineada, dy_pix, dx_pix)
 
-imagen_unida = ida_crop + vuelta_crop
-graficar(imagen_unida,10,200)
+ida_vuelta = ida_crop + vuelta_crop
 
-params_union, err_union = fit_gaussian_2d(imagen_unida.T)
+graficar(ida_vuelta,10,200)
+params_ida_vuelta = fit_gaussian_2d(ida_vuelta)
 
-A_u, x0_u, y0_u, sx_u, sy_u, off_u = params_union
-# Tamaño de píxel en µm
-px_size_x = FOV_x / nx
-px_size_y = FOV_y / ny
+A_i, x0_iv, y0_iv, sx_i, sy_i, off_i = params_ida_vuelta
+
 
 # Convertir posiciones a µm
-x_u_um = x0_u * px_size_x
-y_u_um = y0_u * px_size_y
+x_i_um = x0_iv * px_size_x
+y_i_um = y0_iv * px_size_y
+print(x0_i,y0_i)
+print(x0_v,y0_v)
+print(x0_iv,y0_iv)
+#%%
 
-# Convertir sigmas a µm
-sx_u_um = sx_u * px_size_x
-sy_u_um = sy_u * px_size_y
+x_centers = []
+y_centers = []
 
+n_frames = len(datos)
 
-error_x0_union = err_union[1]
-error_y0_union = err_union[2]
+for i in range(0, n_frames-1, 2):
 
+    # --- 1️⃣ Sumar dos idas y dos vueltas ---
+    ida_sum = datos[i][0][15:40,35:85].T + datos[i+1][0][15:40,35:85].T
+    vuelta_sum = datos[i][1][15:40,35:85].T + datos[i+1][1][15:40,35:85].T
 
-#%% Construccion de la curva de localización simulada
-# Región de imagen
-FOV = 10.0  # µm
-n_pixels = 200
-px_size = FOV / n_pixels
+    # --- 2️⃣ Calcular shift ---
+    dy_pix, dx_pix, _ = cross_correlation_shift(ida_sum, vuelta_sum)
 
-# Grilla en µm
-x = np.linspace(0, FOV, n_pixels)
-y = np.linspace(0, FOV, n_pixels)
-X, Y = np.meshgrid(x, y)
-
-# Parámetros verdaderos del emisor
-x0_true = 5.0       # µm
-y0_true = 5.0       # µm
-sigma_true = 0.15  # µm (PSF)
-background = 5   # cuentas promedio por pixel
-
-# def simulate_gaussian_image(Nphotons):
-
-#     # Gaussiana discreta normalizada
-#     gauss = np.exp(-((X - x0_true)**2/(2*sigma_true**2) +
-#                      (Y - y0_true)**2/(2*sigma_true**2)))
-
-#     gauss /= gauss.sum()   # NORMALIZACIÓN DISCRETA
-
-#     image = Nphotons * gauss + background
-
-#     noisy = np.random.poisson(image)
-
-#     y_max, x_max = np.unravel_index(np.argmax(noisy), noisy.shape)
-
-#     p0 = (
-#         noisy.max(),
-#         x[x_max],
-#         y[y_max],
-#         0.2,
-#         0.2,
-#         background
-#     )
-
-#     try:
-#         popt, _ = curve_fit(
-#             gaussian_2d,
-#             (X, Y),
-#             noisy.ravel(),
-#             p0=p0,
-#             maxfev=5000
-#         )
-#         return popt[1], popt[2], noisy
-
-#     except:
-#         return np.nan, np.nan
-def simulate_gaussian_image(Nphotons):
-
-    # --------- Generar imagen ----------
-    gauss = np.exp(-((X - x0_true)**2/(2*sigma_true**2) +
-                      (Y - y0_true)**2/(2*sigma_true**2)))
-
-    gauss /= gauss.sum()
-
-    image = Nphotons * gauss + background
-    noisy = np.random.poisson(image)
-
-    # --------- Encontrar máximo ----------
-    y_max, x_max = np.unravel_index(np.argmax(noisy), noisy.shape)
-
-    # --------- Recortar ROI ----------
-    roi_half = 10   # 21x21 píxeles aprox
-    xmin = max(x_max - roi_half, 0)
-    xmax = min(x_max + roi_half, n_pixels)
-    ymin = max(y_max - roi_half, 0)
-    ymax = min(y_max + roi_half, n_pixels)
-
-    roi = noisy[ymin:ymax, xmin:xmax]
-    X_roi = X[ymin:ymax, xmin:xmax]
-    Y_roi = Y[ymin:ymax, xmin:xmax]
-
-    # --------- Estimación inicial robusta (centroide) ----------
-    total = roi.sum()
-    if total <= 0:
-        return np.nan, np.nan, noisy
-
-    x0_guess = (X_roi * roi).sum() / total
-    y0_guess = (Y_roi * roi).sum() / total
-
-    A_guess = roi.max() - np.median(roi)
-    sigma_guess = 0.2
-    offset_guess = np.median(roi)
-
-    p0 = (A_guess, x0_guess, y0_guess,
-          sigma_guess, sigma_guess, offset_guess)
-
-    # --------- Bounds físicos ----------
-    bounds = (
-        [0, x0_guess-1, y0_guess-1, 0.05, 0.05, 0],
-        [np.inf, x0_guess+1, y0_guess+1, 1.0, 1.0, 10]
+    # --- 3️⃣ Alinear vuelta ---
+    vuelta_alineada = shift(
+        vuelta_sum,
+        shift=(dy_pix, dx_pix),
+        mode='constant'
     )
 
-    # --------- Ajuste ----------
-    try:
-        popt, _ = curve_fit(
-            gaussian_2d,
-            (X_roi, Y_roi),
-            roi.ravel(),
-            p0=p0,
-            bounds=bounds,
-            maxfev=10000
-        )
+    # --- 4️⃣ Recortar región común ---
+    ida_crop, vuelta_crop = crop_overlap(
+        ida_sum,
+        vuelta_alineada,
+        dy_pix,
+        dx_pix
+    )
 
-        return popt[1], popt[2], noisy
+    # --- 5️⃣ Unir ---
+    imagen_unida = ida_crop + vuelta_crop
+    imagen_unida[10:60,10:60]
+    # 5️⃣ Ajustar
+    params = fit_gaussian_2d(imagen_unida)
+    A_i, x0_i, y0_i, sx_i, sy_i, off_i = params
+    
+    x0 = x0_i
+    y0 = y0_i
 
-    except:
-        return np.nan, np.nan, noisy
+    x_centers.append(x0)
+    y_centers.append(y0)
+    plt.imshow(imagen_unida)
+    plt.scatter(x0_i, y0_i, c='red', s=50)
+
+x_centers = np.array(x_centers) * px_size_x
+y_centers = np.array(y_centers) * px_size_y
+sigma_x_exp = np.std(x_centers)
+sigma_y_exp = np.std(y_centers)
+
+print(f"Precisión experimental:")
+print(f"sigma_x = {sigma_x_exp:.3f} µm")
+print(f"sigma_y = {sigma_y_exp:.3f} µm")
+#%%
+img_ida = datos[0][0] + datos[0][1]
+img_vuelta = datos[1][0] + datos[1][1]
+dy_pix, dx_pix, _ = cross_correlation_shift(img_ida, img_vuelta)
+
+# --- 3️⃣ Alinear vuelta ---
+vuelta_alineada = shift(
+    img_vuelta,
+    shift=(dy_pix, dx_pix),
+    mode='constant'
+)
+ida_crop, vuelta_crop = crop_overlap(
+    img_ida,
+    vuelta_alineada,
+    dy_pix,
+    dx_pix
+)
+imagen_unida = ida_crop + vuelta_crop
+roi = imagen_unida[15:40,35:85]
+background = np.median(roi)
+roi_sin_fondo = roi - background
+roi_sin_fondo[roi_sin_fondo < 0] = 0
+
+N_total = np.sum(roi_sin_fondo)
+plt.imshow(roi_sin_fondo)
 
 
 
-_,_, simu= simulate_gaussian_image(1000)
-graficar(simu, 10,200)
-params_simu = fit_gaussian_2d(simu)
-A_s, x0_s, y0_s, sx_s, sy_s, off_s = params_simu
-#Tamaño de píxel en µm
-px_size_x = FOV_x / nx
-px_size_y = FOV_y / ny
+#%%Estudio del sesgo 
+datos_75 =  sd.ScanDataFile.open(r"C:\Users\Luis1\Downloads\medicion_idavuelta\scan_05_scan.NPY")
+datos_14 = sd.ScanDataFile.open(r"C:\Users\Luis1\Downloads\medicion_idavuelta\scan_00_scan.NPY")
+datos_285 = sd.ScanDataFile.open(r"C:\Users\Luis1\Downloads\medicion_idavuelta\scan_07_scan.NPY")
+datos_17 = sd.ScanDataFile.open(r"C:\Users\Luis1\Downloads\medicion_idavuelta\scan_02_scan.NPY")
+def localizar(image):
 
-# Convertir posiciones a µm
-x_s_um = x0_s * px_size_x
-y_s_um = y0_s * px_size_y
+    y_max, x_max = np.unravel_index(np.argmax(image), image.shape)
+    roi = image[y_max-12:y_max+12, x_max-12:x_max+12]
+
+    params = fit_gaussian_2d(roi)
+    A, x0, y0, sx, sy, off = params
+
+    return x0 , y0 
+
+x_ida_list = []
+x_vuelta_list = []
+x_union_list = []
+
+half = 8
+n_frames = len(datos)
+n_frames = n_frames - (n_frames % 2)
+
+x_ida_list = []
+x_vuelta_list = []
+x_union_list = []
+
+n_frames = len(datos)
+
+def procesar_dataset(datos):
+
+    x_ida_list = []
+    x_vuelta_list = []
+    x_union_list = []
+
+    n_frames = len(datos)
+
+    for k in range(n_frames):
+
+        ida = datos[k][0]
+        vuelta = datos[k][1]
+
+        # ---- Localización ida
+        x_i, y_i = localizar(ida)
+        x_ida_list.append(x_i)
+
+        # ---- Localización vuelta
+        x_v, y_v = localizar(vuelta)
+        x_vuelta_list.append(x_v)
+
+        # ---- Alinear y unir
+        dy, dx, _ = cross_correlation_shift(ida, vuelta)
+        vuelta_alineada = shift(vuelta, shift=(dy, dx), mode='constant')
+
+        ida_crop, vuelta_crop = crop_overlap(ida, vuelta_alineada, dy, dx)
+        union = ida_crop + vuelta_crop
+
+        x_u, y_u = localizar(union)
+        x_union_list.append(x_u)
+
+    return (
+        np.array(x_ida_list),
+        np.array(x_vuelta_list),
+        np.array(x_union_list)
+    )
+
+#%%
+x_ida_75, x_vuelta_75, x_union_75 = procesar_dataset(datos_75)
+
+#%%
+x_ida_14, x_vuelta_14, x_union_14 = procesar_dataset(datos_14)
+#%%
+x_ida_17, x_vuelta_17, x_union_17 = procesar_dataset(datos_17)
+#%%
+x_ida_285, x_vuelta_285, x_union_285 = procesar_dataset(datos_285)
 
 
+#%%
+def localizar(image):
 
-# Convertir sigmas a µm
-sx_s_um = sx_s * px_size_x
-sy_s_um = sy_s * px_size_y
+    y_max, x_max = np.unravel_index(np.argmax(image), image.shape)
+
+    roi = image[15:40,35:85]
+
+    params = fit_gaussian_2d(roi)
+    A, x0, y0, sx, sy, off = params
+
+    return x0 , y0 
+
+x_ida_list = []
+x_vuelta_list = []
+x_union_list = []
+
+half = 8
+n_frames = len(datos)
+n_frames = n_frames - (n_frames % 2)
+
+x_ida_list = []
+x_vuelta_list = []
+x_union_list = []
+
+n_frames = len(datos)
+
+def procesar_dataset(datos):
+
+    x_ida_list = []
+    x_vuelta_list = []
+    x_union_list = []
+
+    n_frames = len(datos)
+
+    for k in range(n_frames):
+
+        ida = datos[k][0]
+        vuelta = datos[k][1]
+
+        # ---- Localización ida
+        x_i, y_i = localizar(ida)
+        x_ida_list.append(x_i)
+
+        # ---- Localización vuelta
+        x_v, y_v = localizar(vuelta)
+        x_vuelta_list.append(x_v)
+
+        # ---- Alinear y unir
+        dy, dx, _ = cross_correlation_shift(ida, vuelta)
+        vuelta_alineada = shift(vuelta, shift=(dy, dx), mode='constant')
+
+        ida_crop, vuelta_crop = crop_overlap(ida, vuelta_alineada, dy, dx)
+        union = ida_crop + vuelta_crop
+
+        x_u, y_u = localizar(union)
+        x_union_list.append(x_u)
+
+    return (
+        np.array(x_ida_list),
+        np.array(x_vuelta_list),
+        np.array(x_union_list)
+    )
+
+#%%
+x_ida_75, x_vuelta_75, x_union_75 = procesar_dataset(datos_75)
+
+#%%
+x_ida_14, x_vuelta_14, x_union_14 = procesar_dataset(datos_14)
+#%%
+x_ida_17, x_vuelta_17, x_union_17 = procesar_dataset(datos_17)
+#%%
+x_ida_285, x_vuelta_285, x_union_285 = procesar_dataset(datos_285)
 
 
 #%%
 
-def localization_precision(Nphotons, n_repeats=200):
+#%% sumando de a dos frames
+# Procesar SOLO dataset 285
+x_ida_285, x_vuelta_285, x_union_285 = procesar_dataset(datos_17)
 
-    x_positions = []
+# Convertir a nm
+pixel_size_nm = 10/200  # ajustá si hace falta
 
-    for _ in range(n_repeats):
-
-        x_fit, y_fit, _ = simulate_gaussian_image(Nphotons)
-
-        if not np.isnan(x_fit):
-            x_positions.append(x_fit)
-
-    x_positions = np.array(x_positions)
-
-    return np.std(x_positions)
-
-
-N_values = np.linspace(250,1000,60)
-precisions = []
-for N in N_values:
-    prec = localization_precision(N)
-    precisions.append(prec)
-precisions = np.array(precisions)
-#%%
+x_ida_nm = x_ida_285 * pixel_size_nm
+x_vuelta_nm = x_vuelta_285 * pixel_size_nm
+x_union_nm = x_union_285 * pixel_size_nm
 plt.figure()
+plt.hist(x_ida_nm, bins=12, alpha=0.7, label="Ida")
+plt.hist(x_vuelta_nm, bins=12, alpha=0.7, label="Vuelta")
+plt.hist(x_union_nm, bins=8, alpha=0.7, label="Ida + Vuelta")
 
-plt.plot(N_values, precisions, '-', label="Simulación", color = "olivedrab")
-sigma = np.sqrt(0.13**2 + 0.13**2) + 0.02 #Ajuste + PSF 
-plt.scatter(595, 0.3 , label = "Experimental",color = "darkolivegreen")
-plt.xlabel("Número de fotones N")
-plt.ylabel("Precisión de localización (µm)")
 plt.legend()
-plt.grid()
-plt.show()
+plt.xlabel("Posición en x ($\mu m$)")
+plt.ylabel("Frecuencia")
 
+print("Bias ida-vuelta (nm):",
+      np.mean(x_vuelta_nm - x_ida_nm))
