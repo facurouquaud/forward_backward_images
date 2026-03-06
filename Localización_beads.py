@@ -542,12 +542,25 @@ def analizar_frames_ida_vuelta(datos):
     x_u_list = []
     y_u_list = []
 
-    for i in range(n_frames):
+    roi = (slice(50, 80), slice(95, 125))
+    for i in range(n_frames - 6):
 
-        # ---ROI ---
-        ida_sum = datos[i][0][50:80,95:125].astype(float)  
-        vuelta_sum = datos[i][1][50:80,95:125].astype(float)
+        # ROI ---
 
+        ida_sum = (
+            datos[i][0][roi].astype(float) +
+            datos[54][0][roi].astype(float)+
+            datos[55][0][roi].astype(float) + 
+            datos[53][0][roi].astype(float) + 
+            datos[52][0][roi].astype(float))
+        
+    
+        vuelta_sum = (datos[i][1][roi].astype(float) +
+                      datos[54][1][roi].astype(float)+
+                      datos[55][1][roi].astype(float)+
+                      datos[53][1][roi].astype(float)+ 
+                      datos[52][0][roi].astype(float))
+        
         # --Ajuste gaussiano ---
         params_ida, _ = fit_gaussian_2d(ida_sum.T)
         params_vuelta, _ = fit_gaussian_2d(vuelta_sum.T)
